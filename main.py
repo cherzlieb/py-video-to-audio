@@ -19,12 +19,13 @@ class ConverterThread(QThread):
         self.running = True  # Thread läuft standardmäßig weiter
 
     def run(self):
-        mp4_files = [f for f in os.listdir(self.input_folder) if f.endswith(".mp4")]
-        total_files = len(mp4_files)
+        video_files = [f for f in os.listdir(self.input_folder) if f.endswith((".mp4", ".webm", ".mkv"))]
+        print(f"Gefundene Dateien: {video_files}")
+        total_files = len(video_files)
         if total_files == 0:
             return
 
-        for i, mp4_file in enumerate(mp4_files, start=1):
+        for i, mp4_file in enumerate(video_files, start=1):
             if not self.running:  # Überprüfung für Abbrechen
                 print("Konvertierung abgebrochen!")
                 break
@@ -36,14 +37,20 @@ class ConverterThread(QThread):
                 "-i", mp4_path,
                 "-vn",
                 "-acodec",
-                "libmp3lame" if self.audio_format == "mp3" else "pcm_s16le" if self.audio_format == "wav" else "flac" if self.audio_format == "flac" else "libvorbis",
+                "libmp3lame" if self.audio_format == "mp3" else
+                "pcm_s16le" if self.audio_format == "wav" else
+                "flac" if self.audio_format == "flac" else
+                "libvorbis" if self.audio_format == "ogg" else
+                "libopus" if self.audio_format == "opus" else "aac",
                 "-b:a", self.bitrate,
                 "-ar", self.sampling_rate,
                 audio_path
             ]
 
             # Speichert den laufenden Prozess
-            self.process = subprocess.Popen(command)
+            self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = self.process.communicate()
+            print(f"FFmpeg-Fehler: {stderr.decode()}")
 
             self.process.wait()  # Wartet auf Abschluss
             self.progress_signal.emit(int((i / total_files) * 100))  # Fortschritt aktualisieren
